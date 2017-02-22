@@ -1,0 +1,4 @@
+* Comments 2/21
+
+1. The files will normally not be in the current directory. Please
+   define a variable such as file.dir

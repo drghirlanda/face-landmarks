@@ -1,0 +1,301 @@
+% Created 2017-02-21 Tue 21:02
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{fixltx2e}
+\usepackage{graphicx}
+\usepackage{longtable}
+\usepackage{float}
+\usepackage{wrapfig}
+\usepackage{rotating}
+\usepackage[normalem]{ulem}
+\usepackage{amsmath}
+\usepackage{textcomp}
+\usepackage{marvosym}
+\usepackage{wasysym}
+\usepackage{amssymb}
+\usepackage{hyperref}
+\usepackage{mathptmx}
+\tolerance=1000
+\usepackage{color}
+\usepackage{listings}
+\usepackage[margin=1in]{geometry}
+\author{Stefano Ghirlanda}
+\date{\today}
+\title{Project Comments}
+\hypersetup{
+  pdfkeywords={},
+  pdfsubject={},
+  pdfcreator={Emacs 24.5.1 (Org mode 8.2.10)}}
+\begin{document}
+
+\maketitle
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{2ex}
+
+I see that you have switched to using \verb~data.table~ and the \verb~apply~
+function to aggregate data. That's great, but \verb~data.table~ has many
+more features that can simplify our work greatly. I'll explain
+below. 
+
+Using \verb~data.table~ can help us fix some issue with your current code:
+
+\begin{enumerate}
+\item We will not have always four files for each face. So we need an
+approach that does not hard-code the number of files for each
+face. This is very easy using \verb~data.table~.
+
+\item Using \verb~data.table~, the calculations of \verb~sd~ and other quantities
+can be streamlined even more. \verb~data.table~ is also coded in C, very
+efficiently, and it is \emph{very} fast.
+
+\item Landmark files will normally not be in the current directory. We
+should have a variable such as \verb~data.dir~ and then use 
+\verb~paste0( data.dir, "/*.xlsx" )~ to generate the string that is
+passed to \verb~list.files~. (This point is not related to \verb~data.table~.)
+\end{enumerate}
+
+Below I will guide you to solve these problems. I am not going to
+write the code for you :) but I will tell you how to use \verb~data.table~,
+and I will provide some examples and pseudo-code.
+
+\section*{A note on separation of function}
+\label{sec-1}
+
+In your current code, you read and process one file at a time, but I
+think it is cleaner to split the code into two separate stages, data
+acquisition and data processing. Pseudo-code for data acquisition can
+be as follows:
+
+\lstset{language=R,label= ,caption= ,numbers=none}
+\begin{lstlisting}
+landmarks <- NULL # data structure, initially empty
+for( file in file.list ) {
+    ## 1. read file
+    ## 2. append file to landmarks
+}
+\end{lstlisting}
+
+For step 1, just use \verb~read_excel~ as you are doing already. Say that
+the result is in variable \verb~x~. For step 2, use the function \verb~rbind~
+(bind by row) to glue together \verb~x~ and \verb~landmarks~:
+
+\lstset{language=R,label= ,caption= ,numbers=none}
+\begin{lstlisting}
+## step 2. in the loop above:
+landmarks <- rbind( landmarks, x )
+\end{lstlisting}
+
+The loop then produces a \verb~landmarks~ data structure that we can
+convert to \verb~data.table~ for further processing:
+
+\lstset{language=R,label= ,caption= ,numbers=none}
+\begin{lstlisting}
+landmarks <- data.table( landmarks )
+\end{lstlisting}
+
+At this point you may ask: but now how do I know which face a data
+point refers to? The answer is that the landmarks file have been
+designed with this kind of data processing in mind. Each line in a
+landmark file includes information about which point and which face it
+belongs to, and about who marked the point. Using this information,
+\verb~data.table~ can do quite a bit of magic for us. 
+
+\section*{Data table summary}
+\label{sec-2}
+
+\subsection*{Introduction}
+\label{sec-2-1}
+
+\begin{itemize}
+\item A regular \verb~data.frame~ is naturally indexed as a 2D array: if \verb~x~ is
+a \verb~data.frame~, then \verb~x[i,j]~ is the elemnt in row $i$ and column
+$j$.
+\item In other words, the \verb~data.frame~ operator \verb~[]~ is used for indexing.
+\item The \verb~data.table~ operator \verb~[]~, on the other hand, is redefined to
+also enable computing on the contents of the \verb~data.table~.
+\item This operator can take 3 arguments, rather than 2, that are usually
+called (from first to last):
+\begin{itemize}
+\item the \verb~i~ argument
+\item the \verb~j~ argument
+\item the \verb~by~ argument
+\end{itemize}
+\end{itemize}
+
+We can explain these arguments with a few examples. In the following,
+you will see R code and, right below, the results it
+produces. Consider the following data assumed to be in a \verb~data.frame~
+called \verb~d~:
+
+\begin{center}
+\begin{tabular}{llr}
+Person & Sex & Age\\
+\hline
+John & M & 20\\
+Jack & M & 22\\
+Ann & F & 21\\
+Sue & F & 30\\
+\end{tabular}
+\end{center}
+
+We first convert to \verb~data.table~:
+
+\lstset{language=R,label= ,caption= ,numbers=none}
+\begin{lstlisting}
+library(data.table)
+d <- data.table( data )
+\end{lstlisting}
+
+\subsection*{Use the first argument to index:}
+\label{sec-2-2}
+
+You can index using the \verb~i~ argument. For example, you can index by
+\verb~Sex~:
+\lstset{language=R,label= ,caption= ,numbers=none}
+\begin{lstlisting}
+d[ Sex=="F" ]
+\end{lstlisting}
+
+\begin{verbatim}
+   Person Sex Age
+1:    Ann   F  21
+2:    Sue   F  30
+\end{verbatim}
+
+Or you can index by age:
+\lstset{language=R,label= ,caption= ,numbers=none}
+\begin{lstlisting}
+d[ Age>21 ]
+\end{lstlisting}
+
+\begin{verbatim}
+   Person Sex Age
+1:   Jack   M  22
+2:    Sue   F  30
+\end{verbatim}
+
+Note that the variables \verb~Sex~ and \verb~Age~ are automatically in scope (if
+\verb~d~ had been a simple \verb~data.frame~, you would have had to write 
+\verb~d[ d$Sex=="F" ]~ etc.).
+
+\subsection*{Use the second argument to perform computations:}
+\label{sec-2-3}
+
+You can perform computations on the data using the \verb~j~ argument:
+\lstset{language=R,label= ,caption= ,numbers=none}
+\begin{lstlisting}
+d[ Sex=="M", mean(Age) ]
+\end{lstlisting}
+
+\begin{verbatim}
+[1] 21
+\end{verbatim}
+
+And you can even perform multiple computations, using the syntax \verb~.()~
+to build lists of results:
+\lstset{language=R,label= ,caption= ,numbers=none}
+\begin{lstlisting}
+d[ Sex=="M", .( mean(Age), sd(Age) ) ]
+\end{lstlisting}
+
+\begin{verbatim}
+   V1       V2
+1: 21 1.414214
+\end{verbatim}
+
+The result is a \verb~data.table~, in which the results of your computation
+have been assigned names \verb~V1~ and \verb~V2~ (you can rename these, an
+example is below).
+
+You can perform computation on the whole \verb~data.table~ by leaving the
+\verb~i~ argument empty. The number of females can be calculated like this:
+\lstset{language=R,label= ,caption= ,numbers=none}
+\begin{lstlisting}
+d[, sum( Sex=="F" ) ]
+\end{lstlisting}
+
+\begin{verbatim}
+[1] 2
+\end{verbatim}
+
+\subsection*{Use the third argument to group data}
+\label{sec-2-4}
+
+What if we want to calculate the mean age separately by sex? We can do
+this in a single call using the \verb~by~ argument:
+\lstset{language=R,label= ,caption= ,numbers=none}
+\begin{lstlisting}
+d[, mean(Age), by=Sex ]
+\end{lstlisting}
+
+\begin{verbatim}
+   Sex   V1
+1:   M 21.0
+2:   F 25.5
+\end{verbatim}
+
+The result is another \verb~data.table~ with \verb~Sex~ as one column and the
+result of the computation automatically named \verb~V1~. You can give a
+better name as follows:
+\lstset{language=R,label= ,caption= ,numbers=none}
+\begin{lstlisting}
+d2 <- d[, mean(Age), by=Sex ]
+setnames( d2, "V1", "meanAge" )
+d2
+\end{lstlisting}
+
+\begin{verbatim}
+   Sex meanAge
+1:   M    21.0
+2:   F    25.5
+\end{verbatim}
+
+You can also group by multiple variables. Suppose you have this other \verb~data.frame~:
+
+\begin{center}
+\begin{tabular}{llrr}
+Person & Sex & Age & Weight\\
+\hline
+John & M & 25 & 150\\
+Jack & M & 22 & 170\\
+Ann & F & 21 & 140\\
+Sue & F & 25 & 145\\
+Al & M & 22 & 180\\
+Lucy & F & 21 & 160\\
+\end{tabular}
+\end{center}
+
+You can calculate mean weight by age and sex as follows:
+\lstset{language=R,label= ,caption= ,numbers=none}
+\begin{lstlisting}
+d[, mean(Weight), by=.(Age,Sex) ]
+\end{lstlisting}
+
+\begin{verbatim}
+   Age Sex  V1
+1:  25   M 150
+2:  22   M 175
+3:  21   F 150
+4:  25   F 145
+\end{verbatim}
+
+Finally, note that the \verb~by~ argument can itself contain
+computations. Suppose we want to split age in ``old'' and ``young'' using
+a cutoff of 23. We can do it simply like this:
+\lstset{language=R,label= ,caption= ,numbers=none}
+\begin{lstlisting}
+d[ , mean(Weight), by=Age<23 ]
+\end{lstlisting}
+
+\begin{verbatim}
+     Age    V1
+1: FALSE 147.5
+2:  TRUE 162.5
+\end{verbatim}
+
+Note that the grouping variable \verb~Age~ retains its name, but its value
+is the result of the computation in \verb~by~ rather then original age
+value.
+% Emacs 24.5.1 (Org mode 8.2.10)
+\end{document}

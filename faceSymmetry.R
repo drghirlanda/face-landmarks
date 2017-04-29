@@ -47,4 +47,9 @@ midpoint <- meanTable[,lapply(.SD,mean),by=c("Description","Face"),.SDcols=4]
 #standard deviation of the all midpoints
 sdX <- midpoint[, sd(meanX,na.rm=TRUE), by=Face]
 setnames(sdX, "V1", "sdX")
-sdX
+
+sdY <- meanTable[,sd(meanY,na.rm=TRUE),by=Face][order(Face)]
+setnames(sdY, "V1", "sdY")
+
+Symmetry <- cbind(sdX[,1:2],sdY[,2])
+Symmetry

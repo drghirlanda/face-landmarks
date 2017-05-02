@@ -1,11 +1,11 @@
 library("readxl")
 #all files that contain ".xlsx" will be stored in file.list
-file.list <- list.files(pattern = "*xlsx")
+file.list <- list.files(path = "Measurements")
 
 #landmarkTable combines all the excel files into one table
 landmarkTable <-NULL
 for(file in file.list){
-  x <- read_excel(file)
+  x <- read_excel(paste0("Measurements/",file))
   landmarkTable <- rbind(landmarkTable,x)
 }
 
